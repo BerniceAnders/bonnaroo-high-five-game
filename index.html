@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bonnaroo High Five Game</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #00A651; /* Bonnaroo green */
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        canvas {
+            border: 2px solid #ED1C24; /* Bonnaroo red */
+            touch-action: none; /* Prevent default touch behaviors */
+            max-width: 100%;
+            height: auto;
+        }
+        #howToPlay, #gameOver {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            color: #FFCC00; /* Bonnaroo yellow */
+            padding: 20px;
+            text-align: center;
+            display: none;
+            max-width: 90%;
+            box-sizing: border-box;
+        }
+        h1 {
+            color: #ED1C24;
+        }
+        button {
+            background: #662D91; /* Bonnaroo purple */
+            color: #FFFFFF;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #00AEEF; /* Bonnaroo blue */
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="howToPlay">
+        <h1>Bonnaroo High Five Game</h1>
+        <p>Objective: Get as many high fives as possible in 1:30!</p>
+        <p>Move: Arrow keys (PC) or touch joystick (mobile)</p>
+        <p>High Five: Collide with festival-goers (yellow)</p>
+        <p>Avoid Food Vendors: They block your path</p>
+        <p>Avoid Pedicabs: -3 high fives</p>
+        <p>Avoid Security: -10 high fives</p>
+        <p><button onclick="startGame()">Start Game</button></p>
+    </div>
+    <div id="gameOver">
+        <h1>HAPPY ROO!</h1>
+        <p id="scoreText"></p>
+        <p id="rankText"></p>
+        <p><button onclick="backToStart()">Play Again</button></p>
+    </div>
+    <audio id="backgroundMusic" src="background_music.mp3" loop preload="auto"></audio>
+
+    <!-- Firebase SDK for future leaderboard -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js"></script>
+
+    <script>
+        // Firebase config (add when ready for leaderboard)
+        const firebaseConfig = {
+            apiKey: "your-api-key",
+            authDomain: "your-project.firebaseapp.com",
+            projectId: "your-project-id",
+            storageBucket: "your-project.appspot.com",
+            messagingSenderId: "your-id",
+            appId: "your-app-id"
+        };
+        // Uncomment when adding leaderboard
+        // firebase.initializeApp(firebaseConfig);
+        // const db = firebase.firestore();
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const howToPlay = document.getElementById('howToPlay');
+        const gameOver = document.getElementById('gameOver');
+        const music = document.getElementById('backgroundMusic');
+
+        // Detect mobile
+        const isMobile = /Mobi|Android/i.test(navigator.userAgent) || 'ontouchstart' in window;
+
+        // Set canvas size
+        canvas.width = 800;
+        canvas.height = isMobile ? 800 : 600;
+
+        // Bonnaroo color palette
+        const COLORS = {
+            RED: '#ED1C24',
+            YELLOW: '#FFCC00',
+            GREEN: '#00A651',
+            PURPLE: '#662D91',
+            BLUE: '#00AEEF',
+            WHITE: '#FFFFFF',
+            BLACK: '#000000'
+        };
+
+        // Game settings
+        const GAME_DURATION = 90;
+        const PLAYER_SPEED = 5;
+        const FESTIVAL_GOER_SPEED_MIN = 2;
+        const FESTIVAL_GOER_SPEED_MAX = 4;
+        const VENDOR_SPEED_MIN = 2;
+        const VENDOR_SPEED_MAX = 4;
+        const PEDICAB_SPEED = isMobile ? 4 : 6; // Slower on mobile
+        const SECURITY_SPEED_MIN = 2;
+        const SECURITY_SPEED_MAX = 4;
+        const SECURITY_DETECTION_RANGE = 50;
+        const PEDICAB_PENALTY = 3;
+        const SECURITY_PENALTY = 10;
+
+        // Scoring ranks
+        const RANKS = [
+            { min: 0, max: 5, name: 'Todd the Intern' },
+            { min: 6, max: 20, name: 'Roookie' },
+            { min: 21, max: 28, name: 'Veteran' },
+            { min: 29, max: 35, name: 'Wook' },
+            { min: 36, max: 40, name: 'Total Roovian' }
+        ];
+
+        // Load images
+        const images = {
+            player: new Image(),
+            festivalGoer: new Image(),
+            rotiRolls: new Image(),
+            spicyPie: new Image(),
+            islandNoodles: new Image(),
+            pedicab: new Image(),
+            security: new Image(),
+            arch: new Image(),
+            ferrisWheel: new Image()
+        };
+        images.player.src = 'player.png';
+        images.festivalGoer.src = 'festival_goer.png';
+        images.rotiRolls.src = 'roti_rolls.png';
+        images.spicyPie.src = 'spicy_pie.png';
+        images.islandNoodles.src = 'island_noodles.png';
+        images.pedicab.src = 'pedicab.png';
+        images.security.src = 'security.png';
+        images.arch.src = 'arch.png';
+        images.ferrisWheel.src = 'ferris_wheel.png';
+
+        // Track image loading
+        let imagesLoaded = 0;
+        const totalImages = Object.keys(images).length;
+        Object.values(images).forEach(img => {
+            img.onload = () => {
+                console.log(`Loaded: ${img.src}`);
+                imagesLoaded++;
+                if (imagesLoaded === totalImages) {
+                    console.log('All images loaded');
+                }
+            };
+            img.onerror = () => {
+                console.warn(`Failed to load ${img.src}, using fallback graphics`);
+            };
+        });
+
+        // Game state
+        let player, festivalGoers, vendors, pedicabs, securities, background;
+        let highFives = 0;
+        let timeRemaining = GAME_DURATION;
+        let gameStarted = false;
+        let startTime;
+        let keys = {};
+        let touchJoystick = { active: false, x: 0, y: 0, dx: 0, dy: 0 };
+
+        // Responsive canvas scaling
+        function resizeCanvas() {
+            const maxWidth = window.innerWidth * 0.95;
+            const maxHeight = window.innerHeight * 0.95;
+            const scale = Math.min(maxWidth / canvas.width, maxHeight / canvas.height);
+            canvas.style.width = `${canvas.width * scale}px`;
+            canvas.style.height = `${canvas.height * scale}px`;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Show start screen
+        howToPlay.style.display = 'block';
+
+        // Log audio errors
+        music.onerror = () => console.warn('Failed to load background_music.mp3');
+
+        // Classes
+        class Player {
+            constructor() {
+                this.width = 60;
+                this.height = 60;
+                this.x = canvas.width / 2;
+                this.y = canvas.height - 100;
+                this.color = COLORS.BLUE;
+            }
+            move() {
+                let newX = this.x;
+                let newY = this.y;
+                if (keys['ArrowLeft'] && this.x > 0) newX -= PLAYER_SPEED;
+                if (keys['ArrowRight'] && this.x < canvas.width - this.width) newX += PLAYER_SPEED;
+                if (keys['ArrowUp'] && this.y > 0) newY -= PLAYER_SPEED;
+                if (keys['ArrowDown'] && this.y < canvas.height - this.height) newY += PLAYER_SPEED;
+                if (touchJoystick.active) {
+                    newX += touchJoystick.dx * PLAYER_SPEED;
+                    newY += touchJoystick.dy * PLAYER_SPEED;
+                    newX = Math.max(0, Math.min(canvas.width - this.width, newX));
+                    newY = Math.max(0, Math.min(canvas.height - this.height, newY));
+                }
+                const newRect = { x: newX, y: newY, width: this.width, height: this.height };
+                let canMove = true;
+                for (let vendor of vendors) {
+                    if (collides(newRect, vendor.getRect())) {
+                        canMove = false;
+                        break;
+                    }
+                }
+                if (canMove) {
+                    this.x = newX;
+                    this.y = newY;
+                }
+            }
+            draw() {
+                if (images.player.complete && images.player.naturalWidth !== 0) {
+                    ctx.drawImage(images.player, this.x, this.y, this.width, this.height);
+                } else {
+                    ctx.fillStyle = this.color;
+                    ctx.fillRect(this.x, this.y, this.width, this.height);
+                }
+            }
+            getRect() {
+                return { x: this.x, y: this.y, width: this.width, height: this.height };
+            }
+        }
+
+        class FestivalGoer {
+            constructor() {
+                this.width = 45;
+                this.height = 45;
+                this.x = Math.random() * (canvas.width - this.width);
+                this.y = -this.height;
+                this.speed = FESTIVAL_GOER_SPEED_MIN + Math.random() * (FESTIVAL_GOER_SPEED_MAX - FESTIVAL_GOER_SPEED_MIN);
+                this.color = COLORS.YELLOW;
+            }
+            move() {
+                this.y += this.speed;
+            }
+            draw() {
+                if (images.festivalGoer.complete && images.festivalGoer.naturalWidth !== 0) {
+                    ctx.drawImage(images.festivalGoer, this.x, this.y, this.width, this.height);
+                } else {
+                    ctx.fillStyle = this.color;
+                    ctx.fillRect(this.x, this.y, this.width, this.height);
+                }
+            }
+            getRect() {
+                return { x: this.x, y: this.y, width: this.width, height: this.height };
+            }
+        }
+
+        class Vendor {
+            constructor(name) {
+                this.width = 80;
+                this.height = 50;
+                this.name = name;
+                this.x = Math.random() * (canvas.width - this.width);
+                this.y = -this.height;
+                this.speed = VENDOR_SPEED_MIN + Math.random() * (VENDOR_SPEED_MAX - VENDOR_SPEED_MIN);
+                this.color = {
+                    'Roti Rolls': COLORS.RED,
+                    'Spicy Pie': COLORS.PURPLE,
+                    'Island Noodles': COLORS.GREEN
+                }[name];
+                this.image = {
+                    'Roti Rolls': images.rotiRolls,
+                    'Spicy Pie': images.spicyPie,
+                    'Island Noodles': images.islandNoodles
+                }[name];
+            }
+            move() {
+                this.y += this.speed;
+            }
+            draw() {
+                if (this.image.complete && this.image.naturalWidth !== 0) {
+                    ctx.drawImage(this.image, this.x, this.y, this.width, this.height);
+                } else {
+                    ctx.fillStyle = this.color;
+                    ctx.fillRect(this.x, this.y, this.width, this.height);
+                }
+                ctx.fillStyle = COLORS.WHITE;
+                ctx.font = '14px Arial';
+                ctx.fillText(this.name, this.x + 10, this.y + this.height / 2);
+            }
+            getRect() {
+                return { x: this.x, y: this.y, width: this.width, height: this.height };
+            }
+        }
+
+        class Pedicab {
+            constructor() {
+                this.width = 60;
+                this.height = 30;
+                this.x = Math.random() * (canvas.width - this.width);
+                this.y = -this.height;
+                this.speed = PEDICAB_SPEED;
+                this.color = COLORS.WHITE;
+            }
+            move() {
+                this.y += this.speed;
+            }
+            draw() {
+                if (images.pedicab.complete && images.pedicab.naturalWidth !== 0) {
+                    ctx.drawImage(images.pedicab, this.x, this.y, this.width, this.height);
+                } else {
+                    ctx.fillStyle = this.color;
+                    ctx.fillRect(this.x, this.y, this.width, this.height);
+                }
+            }
+            getRect() {
+                return { x: this.x, y: this.y, width: this.width, height: this.height };
+            }
+        }
+
+        class Security {
+            constructor() {
+                this.width = 53;
+                this.height = 53;
+                this.x = Math.random() * (canvas.width - this.width);
+                this.y = -this.height;
+                this.speed = SECURITY_SPEED_MIN + Math.random() * (SECURITY_SPEED_MAX - SECURITY_SPEED_MIN);
+                this.color = COLORS.BLACK;
+            }
+            move(player) {
+                this.y += this.speed;
+                const dx = player.x - this.x;
+                const dy = player.y - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance < SECURITY_DETECTION_RANGE) {
+                    const speed = this.speed;
+                    this.x += (dx / distance) * speed;
+                    this.y += (dy / distance) * speed;
+                }
+            }
+            draw() {
+                if (images.security.complete && images.security.naturalWidth !== 0) {
+                    ctx.drawImage(images.security, this.x, this.y, this.width, this.height);
+                } else {
+                    ctx.fillStyle = this.color;
+                    ctx.fillRect(this.x, this.y, this.width, this.height);
+                }
+                ctx.fillStyle = COLORS.WHITE;
+                ctx.font = '14px Arial';
+                ctx.fillText('Hooty Hoo', this.x + 5, this.y - 5);
+            }
+            getRect() {
+                return { x: this.x, y: this.y, width: this.width, height: this.height };
+            }
+        }
+
+        class Background {
+            constructor() {
+                this.stage = 0;
+                this.colors = [COLORS.GREEN, COLORS.PURPLE, COLORS.BLUE, COLORS.RED];
+            }
+            update(timeRemaining) {
+                if (timeRemaining <= 60 && this.stage === 0) this.stage = 1; // Arch at 60s
+                else if (timeRemaining <= 30 && this.stage === 1) this.stage = 2; // Ferris wheel at 30s
+                else if (timeRemaining <= 0 && this.stage === 2) this.stage = 3;
+            }
+            draw() {
+                ctx.fillStyle = this.colors[this.stage];
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                if (this.stage >= 1) {
+                    if (images.arch.complete && images.arch.naturalWidth !== 0) {
+                        ctx.drawImage(images.arch, canvas.width / 2 - 75, canvas.height / 2, 150, 75);
+                    } else {
+                        ctx.fillStyle = COLORS.YELLOW;
+                        ctx.fillRect(canvas.width / 2 - 75, canvas.height / 2, 150, 75);
+                    }
+                }
+                if (this.stage >= 2) {
+                    if (images.ferrisWheel.complete && images.ferrisWheel.naturalWidth !== 0) {
+                        ctx.drawImage(images.ferrisWheel, canvas.width - 175, 50, 150, 150);
+                    } else {
+                        ctx.fillStyle = COLORS.RED;
+                        ctx.beginPath();
+                        ctx.arc(canvas.width - 100, 100, 75, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+        }
+
+        // Collision detection
+        function collides(a, b) {
+            return a.x < b.x + b.width &&
+                   a.x + a.width > b.x &&
+                   a.y < b.y + b.height &&
+                   a.y + a.height > b.y;
+        }
+
+        // Touch controls
+        canvas.addEventListener('touchstart', e => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            touchJoystick.active = true;
+            touchJoystick.x = touch.clientX - canvas.offsetLeft;
+            touchJoystick.y = touch.clientY - canvas.offsetTop;
+        });
+
+        canvas.addEventListener('touchmove', e => {
+            e.preventDefault();
+            if (touchJoystick.active) {
+                const touch = e.touches[0];
+                const newX = touch.clientX - canvas.offsetLeft;
+                const newY = touch.clientY - canvas.offsetTop;
+                const dx = newX - touchJoystick.x;
+                const dy = newY - touchJoystick.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                touchJoystick.dx = distance > 20 ? dx / distance : 0;
+                touchJoystick.dy = distance > 20 ? dy / distance : 0;
+            }
+        });
+
+        canvas.addEventListener('touchend', e => {
+            e.preventDefault();
+            touchJoystick.active = false;
+            touchJoystick.dx = 0;
+            touchJoystick.dy = 0;
+        });
+
+        // Game logic
+        function initGame() {
+            player = new Player();
+            festivalGoers = [];
+            vendors = [];
+            pedicabs = [];
+            securities = [];
+            background = new Background();
+            highFives = 0;
+            timeRemaining = GAME_DURATION;
+            startTime = performance.now() / 1000;
+        }
+
+        function startGame() {
+            howToPlay.style.display = 'none';
+            gameOver.style.display = 'none';
+            gameStarted = true;
+            initGame();
+            music.play().catch(e => {
+                console.warn('Music playback failed:', e);
+                const playMusic = () => {
+                    music.play().catch(err => console.warn('Retry failed:', err));
+                    canvas.removeEventListener('touchstart', playMusic);
+                    canvas.removeEventListener('click', playMusic);
+                };
+                canvas.addEventListener('touchstart', playMusic, { once: true });
+                canvas.addEventListener('click', playMusic, { once: true });
+            });
+            gameLoop();
+        }
+
+        function backToStart() {
+            gameOver.style.display = 'none';
+            howToPlay.style.display = 'block';
+            music.pause();
+            music.currentTime = 0;
+        }
+
+        function endGame() {
+            gameStarted = false;
+            const rank = RANKS.find(r => highFives >= r.min && highFives <= r.max) || RANKS[RANKS.length - 1];
+            document.getElementById('scoreText').textContent = `High Fives: ${highFives}`;
+            document.getElementById('rankText').textContent = `Rank: ${rank.name}`;
+            gameOver.style.display = 'block';
+            music.pause();
+            music.currentTime = 0;
+        }
+
+        function gameLoop() {
+            if (!gameStarted) return;
+            const currentTime = performance.now() / 1000;
+            timeRemaining = Math.max(0, GAME_DURATION - (currentTime - startTime));
+            if (timeRemaining <= 0) {
+                endGame();
+                return;
+            }
+            player.move();
+            festivalGoers.forEach(goer => goer.move());
+            vendors.forEach(vendor => vendor.move());
+            pedicabs.forEach(pedicab => pedicab.move());
+            securities.forEach(security => security.move(player));
+            // Debug spawn rates (revert after confirming)
+            if (Math.random() < 0.05) festivalGoers.push(new FestivalGoer());
+            if (Math.random() < 0.02) vendors.push(new Vendor(['Roti Rolls', 'Spicy Pie', 'Island Noodles'][Math.floor(Math.random() * 3)]));
+            if (Math.random() < (isMobile ? 0.03078 : 0.0342)) pedicabs.push(new Pedicab()); // 10% less on mobile
+            if (Math.random() < 0.01) securities.push(new Security());
+            festivalGoers = festivalGoers.filter(goer => {
+                if (collides(player.getRect(), goer.getRect())) {
+                    highFives++;
+                    return false;
+                }
+                return goer.y <= canvas.height;
+            });
+            vendors = vendors.filter(vendor => vendor.y <= canvas.height);
+            pedicabs = pedicabs.filter(pedicab => {
+                if (collides(player.getRect(), pedicab.getRect())) {
+                    highFives = Math.max(0, highFives - PEDICAB_PENALTY);
+                    return false;
+                }
+                return pedicab.y <= canvas.height;
+            });
+            securities = securities.filter(security => {
+                if (collides(player.getRect(), security.getRect())) {
+                    highFives = Math.max(0, highFives - SECURITY_PENALTY);
+                    return false;
+                }
+                return security.y <= canvas.height;
+            });
+            background.update(timeRemaining);
+            background.draw();
+            player.draw();
+            festivalGoers.forEach(goer => goer.draw());
+            vendors.forEach(vendor => vendor.draw());
+            pedicabs.forEach(pedicab => pedicab.draw());
+            securities.forEach(security => security.draw());
+            if (touchJoystick.active) {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.beginPath();
+                ctx.arc(touchJoystick.x, touchJoystick.y, 50, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                ctx.beginPath();
+                ctx.arc(touchJoystick.x + touchJoystick.dx * 30, touchJoystick.y + touchJoystick.dy * 30, 20, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.fillStyle = COLORS.WHITE;
+            ctx.font = '20px Arial';
+            ctx.fillText(`Time: ${Math.ceil(timeRemaining)}s`, 10, canvas.height - 30);
+            ctx.fillText(`High Fives: ${highFives}`, 10, canvas.height - 60);
+            // Debug logs
+            console.log('Festival Goers:', festivalGoers.length);
+            console.log('Vendors:', vendors.length);
+            console.log('Pedicabs:', pedicabs.length);
+            console.log('Securities:', securities.length);
+            console.log('Time Remaining:', timeRemaining);
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Event listeners
+        window.addEventListener('keydown', e => {
+            keys[e.key] = true;
+        });
+        window.addEventListener('keyup', e => {
+            keys[e.key] = false;
+        });
+    </script>
+</body>
+</html>
