@@ -46,6 +46,10 @@
         button:hover {
             background: #00AEEF; /* Bonnaroo blue */
         }
+        #characterPreview {
+            margin: 10px auto;
+            border: 1px solid #ED1C24;
+        }
     </style>
 </head>
 <body>
@@ -54,10 +58,11 @@
         <h1>Bonnaroo High Five Game</h1>
         <p>Objective: Get as many high fives as possible in 1:30!</p>
         <p>Move: Arrow keys (PC) or touch joystick (mobile)</p>
-        <p>High Five: Collide with festival-goers (yellow)</p>
+        <p>High Five: Collide with festival-goers</p>
         <p>Avoid Food Vendors: They block your path</p>
         <p>Avoid Pedicabs: -3 high fives</p>
         <p>Avoid Security: -10 high fives</p>
+        <canvas id="characterPreview" width="400" height="100"></canvas>
         <p><button onclick="startGame()">Start Game</button></p>
     </div>
     <div id="gameOver">
@@ -91,13 +96,15 @@
         const howToPlay = document.getElementById('howToPlay');
         const gameOver = document.getElementById('gameOver');
         const music = document.getElementById('backgroundMusic');
+        const characterPreview = document.getElementById('characterPreview');
+        const previewCtx = characterPreview.getContext('2d');
 
         // Detect mobile
         const isMobile = /Mobi|Android/i.test(navigator.userAgent) || 'ontouchstart' in window;
 
         // Set canvas size
         canvas.width = 800;
-        canvas.height = isMobile ? 800 : 600;
+        canvas.height = isMobile ? 920 : 600; // 15% taller on mobile (800 * 1.15)
 
         // Bonnaroo color palette
         const COLORS = {
@@ -164,12 +171,38 @@
                 imagesLoaded++;
                 if (imagesLoaded === totalImages) {
                     console.log('All images loaded');
+                    drawCharacterPreview();
                 }
             };
             img.onerror = () => {
                 console.warn(`Failed to load ${img.src}, using fallback graphics`);
             };
         });
+
+        // Draw character preview on start screen
+        function drawCharacterPreview() {
+            previewCtx.fillStyle = COLORS.BLACK;
+            previewCtx.fillRect(0, 0, characterPreview.width, characterPreview.height);
+            const chars = [
+                { img: images.festivalGoer, label: 'Festival Goer' },
+                { img: images.rotiRolls, label: 'Vendor' },
+                { img: images.pedicab, label: 'Pedicab' },
+                { img: images.security, label: 'Security' }
+            ];
+            chars.forEach((char, i) => {
+                const x = i * 100;
+                if (char.img.complete && char.img.naturalWidth !== 0) {
+                    previewCtx.drawImage(char.img, x + 25, 10, 50, 50);
+                } else {
+                    previewCtx.fillStyle = COLORS.YELLOW;
+                    previewCtx.fillRect(x + 25, 10, 50, 50);
+                }
+                previewCtx.fillStyle = COLORS.WHITE;
+                previewCtx.font = '14px Arial';
+                previewCtx.textAlign = 'center';
+                previewCtx.fillText(char.label, x + 50, 80);
+            });
+        }
 
         // Game state
         let player, festivalGoers, vendors, pedicabs, securities, background;
@@ -200,10 +233,10 @@
         // Classes
         class Player {
             constructor() {
-                this.width = 60;
-                this.height = 60;
+                this.width = 120; // 2x
+                this.height = 120;
                 this.x = canvas.width / 2;
-                this.y = canvas.height - 100;
+                this.y = canvas.height - 140; // Adjusted for larger size
                 this.color = COLORS.BLUE;
             }
             move() {
@@ -247,8 +280,8 @@
 
         class FestivalGoer {
             constructor() {
-                this.width = 45;
-                this.height = 45;
+                this.width = 67.5; // 45 * 1.5
+                this.height = 67.5;
                 this.x = Math.random() * (canvas.width - this.width);
                 this.y = -this.height;
                 this.speed = FESTIVAL_GOER_SPEED_MIN + Math.random() * (FESTIVAL_GOER_SPEED_MAX - FESTIVAL_GOER_SPEED_MIN);
@@ -272,8 +305,8 @@
 
         class Vendor {
             constructor(name) {
-                this.width = 80;
-                this.height = 50;
+                this.width = 120; // 80 * 1.5
+                this.height = 75; // 50 * 1.5
                 this.name = name;
                 this.x = Math.random() * (canvas.width - this.width);
                 this.y = -this.height;
@@ -310,8 +343,8 @@
 
         class Pedicab {
             constructor() {
-                this.width = 60;
-                this.height = 30;
+                this.width = 90; // 60 * 1.5
+                this.height = 45; // 30 * 1.5
                 this.x = Math.random() * (canvas.width - this.width);
                 this.y = -this.height;
                 this.speed = PEDICAB_SPEED;
@@ -335,8 +368,8 @@
 
         class Security {
             constructor() {
-                this.width = 53;
-                this.height = 53;
+                this.width = 79.5; // 53 * 1.5
+                this.height = 79.5;
                 this.x = Math.random() * (canvas.width - this.width);
                 this.y = -this.height;
                 this.speed = SECURITY_SPEED_MIN + Math.random() * (SECURITY_SPEED_MAX - SECURITY_SPEED_MIN);
@@ -384,19 +417,19 @@
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 if (this.stage >= 1) {
                     if (images.arch.complete && images.arch.naturalWidth !== 0) {
-                        ctx.drawImage(images.arch, canvas.width / 2 - 75, canvas.height / 2, 150, 75);
+                        ctx.drawImage(images.arch, canvas.width / 2 - 225, canvas.height / 2, 450, 225); // 3x
                     } else {
                         ctx.fillStyle = COLORS.YELLOW;
-                        ctx.fillRect(canvas.width / 2 - 75, canvas.height / 2, 150, 75);
+                        ctx.fillRect(canvas.width / 2 - 225, canvas.height / 2, 450, 225);
                     }
                 }
                 if (this.stage >= 2) {
                     if (images.ferrisWheel.complete && images.ferrisWheel.naturalWidth !== 0) {
-                        ctx.drawImage(images.ferrisWheel, canvas.width - 175, 50, 150, 150);
+                        ctx.drawImage(images.ferrisWheel, canvas.width - 262.5, 50, 225, 225); // 1.5x
                     } else {
                         ctx.fillStyle = COLORS.RED;
                         ctx.beginPath();
-                        ctx.arc(canvas.width - 100, 100, 75, 0, Math.PI * 2);
+                        ctx.arc(canvas.width - 112.5, 112.5, 112.5, 0, Math.PI * 2);
                         ctx.fill();
                     }
                 }
@@ -475,6 +508,7 @@
         function backToStart() {
             gameOver.style.display = 'none';
             howToPlay.style.display = 'block';
+            drawCharacterPreview();
             music.pause();
             music.currentTime = 0;
         }
@@ -505,8 +539,8 @@
             // Debug spawn rates (revert after confirming)
             if (Math.random() < 0.05) festivalGoers.push(new FestivalGoer());
             if (Math.random() < 0.02) vendors.push(new Vendor(['Roti Rolls', 'Spicy Pie', 'Island Noodles'][Math.floor(Math.random() * 3)]));
-            if (Math.random() < (isMobile ? 0.03078 : 0.0342)) pedicabs.push(new Pedicab()); // 10% less on mobile
-            if (Math.random() < 0.01) securities.push(new Security());
+            if (Math.random() < (isMobile ? 0.021546 : 0.0342)) pedicabs.push(new Pedicab()); // 30% less on mobile
+            if (Math.random() < (isMobile ? 0.006 : 0.01)) securities.push(new Security()); // 40% less on mobile
             festivalGoers = festivalGoers.filter(goer => {
                 if (collides(player.getRect(), goer.getRect())) {
                     highFives++;
