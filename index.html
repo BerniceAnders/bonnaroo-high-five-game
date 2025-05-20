@@ -104,7 +104,7 @@
 
         // Set canvas size
         canvas.width = 800;
-        canvas.height = isMobile ? 920 : 600; // 15% taller on mobile (800 * 1.15)
+        canvas.height = isMobile ? 1196 : 600; // 30% taller on mobile (920 * 1.3)
 
         // Bonnaroo color palette
         const COLORS = {
@@ -119,7 +119,7 @@
 
         // Game settings
         const GAME_DURATION = 90;
-        const PLAYER_SPEED = 5;
+        const PLAYER_SPEED = isMobile ? 7 : 5; // Faster on mobile
         const FESTIVAL_GOER_SPEED_MIN = 2;
         const FESTIVAL_GOER_SPEED_MAX = 4;
         const VENDOR_SPEED_MIN = 2;
@@ -181,7 +181,7 @@
 
         // Draw character preview on start screen
         function drawCharacterPreview() {
-            previewCtx.fillStyle = COLORS.BLACK;
+            previewCtx.fillStyle = COLORS.PURPLE; // Bonnaroo purple
             previewCtx.fillRect(0, 0, characterPreview.width, characterPreview.height);
             const chars = [
                 { img: images.festivalGoer, label: 'Festival Goer' },
@@ -233,10 +233,10 @@
         // Classes
         class Player {
             constructor() {
-                this.width = 120; // 2x
-                this.height = 120;
+                this.width = isMobile ? 120 : 114; // 5% smaller on desktop
+                this.height = isMobile ? 120 : 114;
                 this.x = canvas.width / 2;
-                this.y = canvas.height - 140; // Adjusted for larger size
+                this.y = canvas.height - (isMobile ? 140 : 134); // Adjusted for size
                 this.color = COLORS.BLUE;
             }
             move() {
@@ -280,8 +280,8 @@
 
         class FestivalGoer {
             constructor() {
-                this.width = 67.5; // 45 * 1.5
-                this.height = 67.5;
+                this.width = isMobile ? 67.5 : 57.375; // 15% smaller on desktop
+                this.height = isMobile ? 67.5 : 57.375;
                 this.x = Math.random() * (canvas.width - this.width);
                 this.y = -this.height;
                 this.speed = FESTIVAL_GOER_SPEED_MIN + Math.random() * (FESTIVAL_GOER_SPEED_MAX - FESTIVAL_GOER_SPEED_MIN);
@@ -305,8 +305,8 @@
 
         class Vendor {
             constructor(name) {
-                this.width = 120; // 80 * 1.5
-                this.height = 75; // 50 * 1.5
+                this.width = isMobile ? 120 : 116.4; // 3% smaller on desktop
+                this.height = isMobile ? 75 : 72.75;
                 this.name = name;
                 this.x = Math.random() * (canvas.width - this.width);
                 this.y = -this.height;
@@ -343,8 +343,8 @@
 
         class Pedicab {
             constructor() {
-                this.width = 90; // 60 * 1.5
-                this.height = 45; // 30 * 1.5
+                this.width = isMobile ? 90 : 85.5; // 5% smaller on desktop
+                this.height = isMobile ? 45 : 42.75;
                 this.x = Math.random() * (canvas.width - this.width);
                 this.y = -this.height;
                 this.speed = PEDICAB_SPEED;
@@ -368,7 +368,7 @@
 
         class Security {
             constructor() {
-                this.width = 79.5; // 53 * 1.5
+                this.width = 79.5;
                 this.height = 79.5;
                 this.x = Math.random() * (canvas.width - this.width);
                 this.y = -this.height;
@@ -417,7 +417,7 @@
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 if (this.stage >= 1) {
                     if (images.arch.complete && images.arch.naturalWidth !== 0) {
-                        ctx.drawImage(images.arch, canvas.width / 2 - 225, canvas.height / 2, 450, 225); // 3x
+                        ctx.drawImage(images.arch, canvas.width / 2 - 225, canvas.height / 2, 450, 225);
                     } else {
                         ctx.fillStyle = COLORS.YELLOW;
                         ctx.fillRect(canvas.width / 2 - 225, canvas.height / 2, 450, 225);
@@ -425,7 +425,7 @@
                 }
                 if (this.stage >= 2) {
                     if (images.ferrisWheel.complete && images.ferrisWheel.naturalWidth !== 0) {
-                        ctx.drawImage(images.ferrisWheel, canvas.width - 262.5, 50, 225, 225); // 1.5x
+                        ctx.drawImage(images.ferrisWheel, canvas.width - 262.5, 50, 225, 225);
                     } else {
                         ctx.fillStyle = COLORS.RED;
                         ctx.beginPath();
@@ -462,8 +462,8 @@
                 const dx = newX - touchJoystick.x;
                 const dy = newY - touchJoystick.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
-                touchJoystick.dx = distance > 20 ? dx / distance : 0;
-                touchJoystick.dy = distance > 20 ? dy / distance : 0;
+                touchJoystick.dx = distance > 15 ? dx / distance : 0; // More responsive
+                touchJoystick.dy = distance > 15 ? dy / distance : 0;
             }
         });
 
@@ -538,9 +538,9 @@
             securities.forEach(security => security.move(player));
             // Debug spawn rates (revert after confirming)
             if (Math.random() < 0.05) festivalGoers.push(new FestivalGoer());
-            if (Math.random() < 0.02) vendors.push(new Vendor(['Roti Rolls', 'Spicy Pie', 'Island Noodles'][Math.floor(Math.random() * 3)]));
-            if (Math.random() < (isMobile ? 0.021546 : 0.0342)) pedicabs.push(new Pedicab()); // 30% less on mobile
-            if (Math.random() < (isMobile ? 0.006 : 0.01)) securities.push(new Security()); // 40% less on mobile
+            if (Math.random() < 0.008) vendors.push(new Vendor(['Roti Rolls', 'Spicy Pie', 'Island Noodles'][Math.floor(Math.random() * 3)])); // 60% less
+            if (Math.random() < (isMobile ? 0.0193914 : 0.03078)) pedicabs.push(new Pedicab()); // 10% less
+            if (Math.random() < (isMobile ? 0.006 : 0.01)) securities.push(new Security());
             festivalGoers = festivalGoers.filter(goer => {
                 if (collides(player.getRect(), goer.getRect())) {
                     highFives++;
@@ -569,7 +569,7 @@
             festivalGoers.forEach(goer => goer.draw());
             vendors.forEach(vendor => vendor.draw());
             pedicabs.forEach(pedicab => pedicab.draw());
-            securities.forEach(security => security.draw());
+            securities.forEach(security...........................................................................) => security.draw());
             if (touchJoystick.active) {
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
                 ctx.beginPath();
@@ -585,6 +585,7 @@
             ctx.fillText(`Time: ${Math.ceil(timeRemaining)}s`, 10, canvas.height - 30);
             ctx.fillText(`High Fives: ${highFives}`, 10, canvas.height - 60);
             // Debug logs
+            console.log('Is Mobile:', isMobile);
             console.log('Festival Goers:', festivalGoers.length);
             console.log('Vendors:', vendors.length);
             console.log('Pedicabs:', pedicabs.length);
