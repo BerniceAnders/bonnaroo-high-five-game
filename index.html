@@ -1,19 +1,120 @@
-<!-- Firebase SDK -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bonnaroo High Five Game</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #00A651;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        canvas {
+            border: 2px solid #ED1C24;
+            touch-action: none;
+            max-width: 100%;
+            height: auto;
+        }
+        #howToPlay, #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: #FFCC00;
+            padding: 20px;
+            text-align: center;
+            display: none;
+            max-width: 90%;
+            box-sizing: border-box;
+            z-index: 10;
+            border: 2px solid #FFCC00;
+        }
+        h1 {
+            color: #ED1C24;
+        }
+        button {
+            background: #662D91;
+            color: #FFFFFF;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #00AEEF;
+        }
+        #characterPreview {
+            margin: 10px auto;
+            border: 1px solid #ED1C24;
+        }
+        input[type="text"] {
+            padding: 5px;
+            margin: 10px;
+            font-size: 16px;
+            border: 1px solid #ED1C24;
+        }
+        #leaderboard {
+            margin-top: 20px;
+            color: #FFFFFF;
+            font-size: 14px;
+        }
+        #leaderboard table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        #leaderboard th, #leaderboard td {
+            padding: 5px;
+            border: 1px solid #FFCC00;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="howToPlay">
+        <h1>Bonnaroo High Five Game</h1>
+        <p>Objective: Get as many high fives as possible in 1:30!</p>
+        <p>Move: Arrow keys (PC) or touch joystick (mobile)</p>
+        <p>High Five: Collide with festival-goers</p>
+        <p>Avoid Food Vendors: They block your path</p>
+        <p>Avoid Pedicabs: -3 high fives</p>
+        <p>Avoid Security: -10 high fives</p>
+        <canvas id="characterPreview" width="400" height="100"></canvas>
+        <p><button onclick="startGame()">Start Game</button></p>
+    </div>
+    <div id="gameOver">
+        <h1>HAPPY ROO!</h1>
+        <p id="scoreText"></p>
+        <p id="rankText"></p>
+        <p><input type="text" id="usernameInput" placeholder="Enter username (max 20 chars)" maxlength="20"></p>
+        <p><button onclick="submitScore()">Submit Score</button></p>
+        <div id="leaderboard"></div>
+        <p><button onclick="backToStart()">Play Again</button></p>
+    </div>
+    <audio id="backgroundMusic" src="background_music.mp3" loop preload="auto"></audio>
+<!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js"></script>
 
 <script>
-     Replace with your Firebase config
+    // Replace with your Firebase config
     const firebaseConfig = {
   	apiKey: "AIzaSyADdgVv48MMjWp6TKtqoxtkQLP0NcEHjnQ",
- 	authDomain: "bonnaroohighfive.firebaseapp.com",
+  	authDomain: "bonnaroohighfive.firebaseapp.com",
   	projectId: "bonnaroohighfive",
   	storageBucket: "bonnaroohighfive.firebasestorage.app",
   	messagingSenderId: "140646895177",
   	appId: "1:140646895177:web:2822df95ade384ca903998"
     };
 
-     Initialize Firebase
+    // Initialize Firebase
     let db;
     try {
         firebase.initializeApp(firebaseConfig);
